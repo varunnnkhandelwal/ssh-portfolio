@@ -380,7 +380,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projectList.SetSize(fixedW, fixedH-4)
 
 	case tea.KeyMsg:
-		if msg.String() == "t" && !m.loading {
+		if msg.String() == "ctrl+t" && !m.loading {
 			m.themeIdx = (m.themeIdx + 1) % len(themes)
 			colAccent = themes[m.themeIdx].color
 			if m.screen != screenHome {
@@ -669,7 +669,7 @@ func (m model) viewHome() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  t theme  ·  q quit"))
+	b.WriteString(st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  ctrl+t theme  ·  q quit"))
 
 	return lipgloss.NewStyle().Width(fixedW).Align(lipgloss.Center).Render(b.String())
 }
@@ -728,7 +728,7 @@ func (m model) viewContent() string {
 	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
 
 	pct := st.muted().Render(fmt.Sprintf("%d%%", int(m.vp.ScrollPercent()*100)))
-	hint := st.italic(colMuted).Render("j/k scroll  ·  esc back  ·  t theme  ·  q quit")
+	hint := st.italic(colMuted).Render("j/k scroll  ·  esc back  ·  ctrl+t theme  ·  q quit")
 	gap := fixedW - lipgloss.Width(hint) - lipgloss.Width(pct)
 	if gap < 1 {
 		gap = 1
@@ -1576,7 +1576,7 @@ func main() {
 
 	srv, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
-		wish.WithHostKeyPath("/data/portfolio-key"),
+		wish.WithHostKeyPath(".ssh/id_ed25519"),
 		wish.WithMiddleware(
 			bm.Middleware(teaHandler),
 			activeterm.Middleware(),
