@@ -1,0 +1,20 @@
+# Compiled binaries
+portfolio
+ssh-portfolio
+*.exe
+
+# SSH keys — never commit these
+.ssh/
+ssh_host_*
+/data/
+
+# Environment
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
