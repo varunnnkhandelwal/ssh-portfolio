@@ -237,6 +237,21 @@ var rocketFlame2 = []string{
 // ── Model ─────────────────────────────────────────────────────────────────────
 
 type doneLoadingMsg struct{}
+// effW / effH return the usable UI dimensions: the fixed maximum or the
+// actual terminal size, whichever is smaller.
+func (m model) effW() int {
+	if m.width > 0 && m.width < fixedW {
+		return m.width
+	}
+	return fixedW
+}
+func (m model) effH() int {
+	if m.height > 0 && m.height < fixedH {
+		return m.height
+	}
+	return fixedH
+}
+
 type typingTickMsg struct{}
 
 var nameArtRunes = []rune(nameArt)
@@ -373,11 +388,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		w, h := m.effW(), m.effH()
 		if !m.vpReady {
-			m.vp = viewport.New(fixedW, fixedH-4)
+			m.vp = viewport.New(w, h-4)
 			m.vpReady = true
+		} else {
+			m.vp.Width = w
+			m.vp.Height = h - 4
 		}
-		m.projectList.SetSize(fixedW, fixedH-4)
+		m.projectList.SetSize(w, h-4)
+		m.contactList.SetSize(w, 18)
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+t" && !m.loading {
@@ -484,7 +504,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.cheatActive = true
 							m.cheatStep = cheatRocket
 							m.cheatSubStep = 0
-							m.cheatRocketY = fixedH - len(rocketLines) - len(rocketFlame1)
+							m.cheatRocketY = m.effH() - len(rocketLines) - len(rocketFlame1)
 							return m, cheatTick(60 * time.Millisecond)
 						case "_CLEAR_":
 							m.pg.responses = nil
@@ -580,11 +600,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── View dispatcher ───────────────────────────────────────────────────────────
 
 func (m model) place(content string) string {
-	box := m.st.r.NewStyle().
-		Width(fixedW).
-		Height(fixedH).
-		Render(content)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	lines := strings.Split(content, "\n")
+
+	// Measure content width (as lipgloss sees it)
+	maxW := 0
+	for _, l := range lines {
+		if w := lipgloss.Width(l); w > maxW {
+			maxW = w
+		}
+	}
+
+	// Horizontal: left-pad only (no right-pad).
+	// Terminals may render ambiguous-width Unicode chars (like █) as
+	// double-wide, so right-padding to terminal width causes wrapping.
+	hPad := (m.width - maxW) / 2
+	if hPad < 0 {
+		hPad = 0
+	}
+	leftPad := strings.Repeat(" ", hPad)
+	blankLine := strings.Repeat(" ", m.width)
+
+	// Vertical: center content in terminal height
+	vPad := (m.height - len(lines)) / 2
+	if vPad < 0 {
+		vPad = 0
+	}
+
+	// Build exactly m.height lines so Bubbletea's renderer fully
+	// covers the screen (prevents ghosting from previous frames).
+	out := make([]string, m.height)
+	for i := range out {
+		ci := i - vPad
+		if ci >= 0 && ci < len(lines) {
+			out[i] = leftPad + lines[ci]
+		} else {
+			out[i] = blankLine
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func (m model) View() string {
@@ -620,10 +673,11 @@ func (m model) View() string {
 
 func (m model) viewProjectList() string {
 	st := m.st
+	w := m.effW()
 	topBar := st.bold(colAccent).Render("Projects") +
 		"  " + st.muted().Render("·") +
 		"  " + st.muted().Render("esc to go back")
-	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
+	divider := st.fg(colBorder).Render(strings.Repeat("─", w))
 	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter open  ·  esc back  ·  ctrl+q quit")
 	return topBar + "\n" + divider + "\n" + m.projectList.View() + "\n" + divider + "\n" + hint
 }
@@ -639,39 +693,67 @@ func (m model) viewLoading() string {
 	}
 	revealed := string(nameArtRunes[:n])
 
+	// Use left-pad centering (same approach as viewHome)
+	loader := m.sp.View() + st.muted().Render(" Loading portfolio...")
+	blockW := lipgloss.Width(strings.Split(nameArt, "\n")[0])
+	if lw := lipgloss.Width(loader); lw > blockW {
+		blockW = lw
+	}
+	centerIn := func(s string) string {
+		pad := (blockW - lipgloss.Width(s)) / 2
+		if pad < 0 {
+			pad = 0
+		}
+		return strings.Repeat(" ", pad) + s
+	}
+
 	var b strings.Builder
 	for _, line := range strings.Split(revealed, "\n") {
-		b.WriteString(st.fg(colAccent).Render(line) + "\n")
+		b.WriteString(centerIn(st.fg(colAccent).Render(line)) + "\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(m.sp.View() + st.muted().Render(" Loading portfolio..."))
-	return lipgloss.NewStyle().Width(fixedW).Align(lipgloss.Center).Render(b.String())
+	b.WriteString(centerIn(loader))
+	return b.String()
 }
 
 // ── Home screen ───────────────────────────────────────────────────────────────
 
 func (m model) viewHome() string {
 	st := m.st
-	var b strings.Builder
 
+	// Find the widest content line to use as the centering reference.
+	// Don't use Width().Align(Center) — it adds right-padding that causes
+	// wrapping when terminals render ambiguous-width chars as double-wide.
+	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  ctrl+t theme  ·  ctrl+q quit")
+	blockW := lipgloss.Width(hint) // widest line sets the block width
+
+	centerIn := func(s string) string {
+		sw := lipgloss.Width(s)
+		pad := (blockW - sw) / 2
+		if pad < 0 {
+			pad = 0
+		}
+		return strings.Repeat(" ", pad) + s
+	}
+
+	var b strings.Builder
 	for _, line := range strings.Split(nameArt, "\n") {
-		b.WriteString(st.fg(colAccent).Render(line) + "\n")
+		b.WriteString(centerIn(st.fg(colAccent).Render(line)) + "\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(st.muted().Render("Product Designer · Bajaj Finserv Health · Pune, India") + "\n\n\n")
+	b.WriteString(centerIn(st.muted().Render("Product Designer · Bajaj Finserv Health · Pune, India")) + "\n\n\n")
 
 	for i, item := range menuItems {
 		if i == m.menuCursor {
-			b.WriteString(st.bold(colAccent).Render("  › "+item.label) + "\n\n")
+			b.WriteString(centerIn(st.bold(colAccent).Render("  › "+item.label)) + "\n\n")
 		} else {
-			b.WriteString(st.muted().Render("    "+item.label) + "\n\n")
+			b.WriteString(centerIn(st.muted().Render("    "+item.label)) + "\n\n")
 		}
 	}
 
 	b.WriteString("\n")
-	b.WriteString(st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  ctrl+t theme  ·  ctrl+q quit"))
-
-	return lipgloss.NewStyle().Width(fixedW).Align(lipgloss.Center).Render(b.String())
+	b.WriteString(hint)
+	return b.String()
 }
 
 // ── Command handler ───────────────────────────────────────────────────────────
@@ -725,11 +807,12 @@ func (m model) viewContent() string {
 		"  " + st.muted().Render("·") +
 		"  " + st.muted().Render("esc to go back")
 
-	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
+	w := m.effW()
+	divider := st.fg(colBorder).Render(strings.Repeat("─", w))
 
 	pct := st.muted().Render(fmt.Sprintf("%d%%", int(m.vp.ScrollPercent()*100)))
 	hint := st.italic(colMuted).Render("j/k scroll  ·  esc back  ·  ctrl+t theme  ·  ctrl+q quit")
-	gap := fixedW - lipgloss.Width(hint) - lipgloss.Width(pct)
+	gap := w - lipgloss.Width(hint) - lipgloss.Width(pct)
 	if gap < 1 {
 		gap = 1
 	}
@@ -810,7 +893,12 @@ func (m model) renderAbout() string {
 			artWidth = len(l)
 		}
 	}
-	gapW := fixedW - leftW - artWidth
+	w := m.effW()
+	// If terminal is too narrow for side-by-side, show text only
+	if w < leftW+artWidth+2 {
+		return st.r.NewStyle().Width(w).Render(left.String())
+	}
+	gapW := w - leftW - artWidth
 	if gapW < 1 {
 		gapW = 1
 	}
@@ -840,7 +928,7 @@ func (d projectDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	sel := index == m.Index()
 	var sb strings.Builder
 	// description wrapped to 2 lines
-	wrapped := strings.SplitN(wrapText(p.detail, fixedW-6), "\n", 3)
+	wrapped := strings.SplitN(wrapText(p.detail, m.Width()-6), "\n", 3)
 	for len(wrapped) < 2 {
 		wrapped = append(wrapped, "")
 	}
@@ -949,16 +1037,17 @@ var contactItems = []contactItem{
 
 func (m model) viewContactList() string {
 	st := m.st
+	w := m.effW()
 	topBar := st.bold(colAccent).Render("Contact") +
 		"  " + st.muted().Render("·") +
 		"  " + st.muted().Render("esc to go back")
-	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
+	divider := st.fg(colBorder).Render(strings.Repeat("─", w))
 
 	var b strings.Builder
 	b.WriteString("\n\n")
 	b.WriteString(st.text().Render(wrapText(
 		"Always happy to chat about product, design, AI, or anything interesting.",
-		fixedW-4,
+		w-4,
 	)) + "\n\n\n")
 	b.WriteString(m.contactList.View())
 	b.WriteString("\n\n")
@@ -976,7 +1065,7 @@ type role struct {
 
 func (m model) renderExperience() string {
 	st := m.st
-	tw := fixedW - 6
+	tw := m.effW() - 6
 	var b strings.Builder
 	b.WriteString("\n")
 
@@ -1351,7 +1440,7 @@ func (m model) handleCheatTick() (tea.Model, tea.Cmd) {
 		m.cheatSubStep++
 		totalFrames := 20
 		rocketH := len(rocketLines) + len(rocketFlame1)
-		startY := fixedH - rocketH
+		startY := m.effH() - rocketH
 		endY := 3
 		progress := m.cheatSubStep * (startY - endY) / totalFrames
 		m.cheatRocketY = startY - progress
@@ -1454,12 +1543,13 @@ func (m model) viewCheatWanted() string {
 
 	var b strings.Builder
 	b.WriteString("\n\n\n\n\n\n\n\n")
-	b.WriteString(st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Render(starLine) + "\n\n")
-	b.WriteString(st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Foreground(red).Bold(true).Render("WANTED LEVEL: 5") + "\n\n\n")
+	w := m.effW()
+	b.WriteString(st.r.NewStyle().Width(w).Align(lipgloss.Center).Render(starLine) + "\n\n")
+	b.WriteString(st.r.NewStyle().Width(w).Align(lipgloss.Center).Foreground(red).Bold(true).Render("WANTED LEVEL: 5") + "\n\n\n")
 
 	if m.cheatStep == cheatMoney {
 		moneyStr := fmt.Sprintf("$ %s", formatMoney(m.cheatMoney))
-		b.WriteString(st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Foreground(green).Bold(true).Render(moneyStr) + "\n")
+		b.WriteString(st.r.NewStyle().Width(w).Align(lipgloss.Center).Foreground(green).Bold(true).Render(moneyStr) + "\n")
 	}
 
 	return b.String()
@@ -1484,7 +1574,7 @@ func (m model) viewCheatResult() string {
 	st := m.st
 	cyan := lipgloss.Color("#00FFFF")
 	green := lipgloss.Color("#00FF66")
-	center := st.r.NewStyle().Width(fixedW).Align(lipgloss.Center)
+	center := st.r.NewStyle().Width(m.effW()).Align(lipgloss.Center)
 
 	var b strings.Builder
 	b.WriteString("\n\n\n\n\n\n")
@@ -1507,10 +1597,11 @@ func (m model) viewCheatRocket() string {
 	cyan := lipgloss.Color("#00FFFF")
 	orange := lipgloss.Color("#FF8800")
 	yellow := lipgloss.Color("#FFDD00")
-	center := st.r.NewStyle().Width(fixedW).Align(lipgloss.Center)
-	rocketSt := st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Foreground(lipgloss.Color("#DDDDDD"))
-	flameSt1 := st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Foreground(orange)
-	flameSt2 := st.r.NewStyle().Width(fixedW).Align(lipgloss.Center).Foreground(yellow)
+	w := m.effW()
+	center := st.r.NewStyle().Width(w).Align(lipgloss.Center)
+	rocketSt := st.r.NewStyle().Width(w).Align(lipgloss.Center).Foreground(lipgloss.Color("#DDDDDD"))
+	flameSt1 := st.r.NewStyle().Width(w).Align(lipgloss.Center).Foreground(orange)
+	flameSt2 := st.r.NewStyle().Width(w).Align(lipgloss.Center).Foreground(yellow)
 
 	if m.cheatStep == cheatRocketDone {
 		var b strings.Builder
