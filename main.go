@@ -28,7 +28,7 @@ import (
 
 const (
 	host         = "0.0.0.0"
-	port         = "2323"
+	port         = "2222"
 	fixedW       = 110 // locked UI width
 	fixedH       = 38  // locked UI height
 	textColWidth = 44
