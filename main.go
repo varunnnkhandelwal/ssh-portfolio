@@ -389,7 +389,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.loading {
-			if msg.String() == "q" || msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
+			if msg.String() == "ctrl+q" {
 				return m, tea.Quit
 			}
 			return m, nil
@@ -397,7 +397,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// ── Cheat animation key routing ───────────────────────────────────────
 		if m.cheatActive {
-			if msg.String() == "q" || msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
+			if msg.String() == "ctrl+q" {
 				return m, tea.Quit
 			}
 			if m.cheatStep == cheatResult || m.cheatStep == cheatRocketDone {
@@ -411,7 +411,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.playgroundOpen {
 			if m.pg.inGame {
 				switch msg.String() {
-				case "q", "ctrl+c", "ctrl+q":
+				case "ctrl+q":
 					return m, tea.Quit
 				case "esc":
 					m.pg.inGame = false
@@ -453,7 +453,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				switch msg.String() {
-				case "q", "ctrl+c", "ctrl+q":
+				case "ctrl+q":
 					return m, tea.Quit
 				case "esc":
 					m.playgroundOpen = false
@@ -507,7 +507,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case screenHome:
 			switch msg.String() {
-			case "q", "ctrl+c", "ctrl+q":
+			case "ctrl+q":
 				return m, tea.Quit
 			case "up":
 				if m.menuCursor > 0 {
@@ -530,7 +530,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case screenProjects:
 			switch msg.String() {
-			case "q", "ctrl+c", "ctrl+q":
+			case "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
@@ -545,7 +545,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case screenContact:
 			switch msg.String() {
-			case "q", "ctrl+c", "ctrl+q":
+			case "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
@@ -560,7 +560,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		default: // content screens
 			switch msg.String() {
-			case "q", "ctrl+c", "ctrl+q":
+			case "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
@@ -624,7 +624,7 @@ func (m model) viewProjectList() string {
 		"  " + st.muted().Render("·") +
 		"  " + st.muted().Render("esc to go back")
 	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
-	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter open  ·  esc back  ·  q quit")
+	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter open  ·  esc back  ·  ctrl+q quit")
 	return topBar + "\n" + divider + "\n" + m.projectList.View() + "\n" + divider + "\n" + hint
 }
 
@@ -669,7 +669,7 @@ func (m model) viewHome() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  ctrl+t theme  ·  q quit"))
+	b.WriteString(st.italic(colMuted).Render("↑↓ navigate  ·  enter select  ·  ctrl+t theme  ·  ctrl+q quit"))
 
 	return lipgloss.NewStyle().Width(fixedW).Align(lipgloss.Center).Render(b.String())
 }
@@ -728,7 +728,7 @@ func (m model) viewContent() string {
 	divider := st.fg(colBorder).Render(strings.Repeat("─", fixedW))
 
 	pct := st.muted().Render(fmt.Sprintf("%d%%", int(m.vp.ScrollPercent()*100)))
-	hint := st.italic(colMuted).Render("j/k scroll  ·  esc back  ·  ctrl+t theme  ·  q quit")
+	hint := st.italic(colMuted).Render("j/k scroll  ·  esc back  ·  ctrl+t theme  ·  ctrl+q quit")
 	gap := fixedW - lipgloss.Width(hint) - lipgloss.Width(pct)
 	if gap < 1 {
 		gap = 1
@@ -964,7 +964,7 @@ func (m model) viewContactList() string {
 	b.WriteString("\n\n")
 	b.WriteString(st.muted().Width(12).Render("Location") + st.text().Render("Pune, India  (IST, UTC+5:30)"))
 
-	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter open  ·  esc back  ·  q quit")
+	hint := st.italic(colMuted).Render("↑↓ navigate  ·  enter open  ·  esc back  ·  ctrl+q quit")
 	return topBar + "\n" + divider + "\n" + b.String() + "\n" + divider + "\n" + hint
 }
 
