@@ -389,7 +389,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.loading {
-			if msg.String() == "q" || msg.String() == "ctrl+c" {
+			if msg.String() == "q" || msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
 				return m, tea.Quit
 			}
 			return m, nil
@@ -397,7 +397,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// ── Cheat animation key routing ───────────────────────────────────────
 		if m.cheatActive {
-			if msg.String() == "q" || msg.String() == "ctrl+c" {
+			if msg.String() == "q" || msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
 				return m, tea.Quit
 			}
 			if m.cheatStep == cheatResult || m.cheatStep == cheatRocketDone {
@@ -411,7 +411,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.playgroundOpen {
 			if m.pg.inGame {
 				switch msg.String() {
-				case "q", "ctrl+c":
+				case "q", "ctrl+c", "ctrl+q":
 					return m, tea.Quit
 				case "esc":
 					m.pg.inGame = false
@@ -453,7 +453,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				switch msg.String() {
-				case "q", "ctrl+c":
+				case "q", "ctrl+c", "ctrl+q":
 					return m, tea.Quit
 				case "esc":
 					m.playgroundOpen = false
@@ -507,7 +507,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case screenHome:
 			switch msg.String() {
-			case "q", "ctrl+c":
+			case "q", "ctrl+c", "ctrl+q":
 				return m, tea.Quit
 			case "up":
 				if m.menuCursor > 0 {
@@ -530,7 +530,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case screenProjects:
 			switch msg.String() {
-			case "q", "ctrl+c":
+			case "q", "ctrl+c", "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
@@ -545,7 +545,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case screenContact:
 			switch msg.String() {
-			case "q", "ctrl+c":
+			case "q", "ctrl+c", "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
@@ -560,7 +560,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		default: // content screens
 			switch msg.String() {
-			case "q", "ctrl+c":
+			case "q", "ctrl+c", "ctrl+q":
 				return m, tea.Quit
 			case "esc":
 				m.screen = screenHome
