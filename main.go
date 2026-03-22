@@ -507,7 +507,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case screenHome:
 			switch msg.String() {
-			case "ctrl+c":
+			case "q", "ctrl+c":
 				return m, tea.Quit
 			case "up":
 				if m.menuCursor > 0 {
