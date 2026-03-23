@@ -741,7 +741,7 @@ func (m model) viewHome() string {
 		b.WriteString(centerIn(st.fg(colAccent).Render(line)) + "\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(centerIn(st.muted().Render("Product Designer · Bajaj Finserv Health · Pune, India")) + "\n\n\n")
+	b.WriteString(centerIn(st.muted().Render("Product Designer · Pune, India")) + "\n\n\n")
 
 	for i, item := range menuItems {
 		if i == m.menuCursor {
